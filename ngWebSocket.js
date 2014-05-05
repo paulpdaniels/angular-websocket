@@ -30,7 +30,7 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
             };
             
             ws.onclose = function(r) {
-              deferred.rejected();
+              deferred.reject();
             };
             
             return deferred.promise;
