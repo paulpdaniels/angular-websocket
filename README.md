@@ -15,9 +15,21 @@ Requires [underscore](http://underscorejs.org/).
 Use:
 
 ```javascript
-angular.module('myModule', ['ngWs'])
-.controller('MyController', function($ws, $timeout) {
 
+angular.module('myModule', ['ngWs'])
+.controller('MyController', function($scope, $ws, $timeout) {
+
+  $scope.aProperty = {a : 5, b : 'aValue'};
+
+  //Use the factory
+  $ws('ws://real-time.org:3000/go')
+    .bind($scope, 'aProperty') //Bind a property to be updated by new messages
+    .onmessage(function(json) {/*Handle a json message */}) 
+    .onbinary(function(binary) {/*Handle a binary message */}) 
+    .onopen(function() {/*Listen for the socket to open*/})
+    .connect(); //Connect a new instance.
+
+  //Or define with your own logic
   var retries = 10;
 
   function reconnect() {
