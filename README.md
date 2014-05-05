@@ -1,7 +1,13 @@
 angular-websocket
 =================
 
-A simple module for utilizing raw websockets in angular
+A simple module for utilizing raw websockets in angular.
+
+
+We all love Socket.io, but there are still servers out there that don't play nice with our 
+beloved realtime call-stack (blasphemy!) thats where this library comes in, a simple call wrapper
+for the browser WebSocket, this framework removes the need for the ugly syntax that is WebSockets
+and replaces is with nicely behaved promises.
 
 
 Requires [underscore](http://underscorejs.org/).
