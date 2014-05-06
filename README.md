@@ -22,7 +22,7 @@ angular.module('myModule', ['ngWs'])
   $scope.aProperty = {a : 5, b : 'aValue'};
 
   //Use the factory
-  $ws('ws://real-time.org:3000/go')
+  $ws('ws://real-time.org:3000/go', {retries : 5, timeout : 5000})
     .bind($scope, 'aProperty') //Bind a property to be updated by new messages
     .onmessage(function(json) {/*Handle a json message */}) 
     .onbinary(function(binary) {/*Handle a binary message */}) 
@@ -34,8 +34,8 @@ angular.module('myModule', ['ngWs'])
 
   function reconnect() {
   
-    //=> ws://real-time.org:3000/go?id=14
-    $ws.connect('ws://real-time.org:3000/go', {id : 14}, [/*Any extensions to be supported*/])
+    //=> ws://real-time.org:3000/go
+    $ws.connect('ws://real-time.org:3000/go', {}, [/*Any extensions to be supported*/])
         .then(function(ws) {
           //Returns a functioning websocket
           ws.onmessage = function(msg) {/*Do something with the incoming message*/};
@@ -55,6 +55,12 @@ angular.module('myModule', ['ngWs'])
         
         });
   }
+
+})
+
+//Configure with your favorite websocket library
+.configure(function($wsProvider) {
+  $wsProvider.setFactory(/*Some other webSocket*/, {/*Remap the interface*/});
 
 });
 
