@@ -15,7 +15,7 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 			  
 			  var options = _.defaults(params, {timeout : 3000, retries : 10});
 			  
-			  var _listeners = {binary : [], str : [], open : []};
+			  var _listeners = {binary : [], str : [], json : [], open : []};
 			  
 			  var self = this;
 			  
@@ -55,7 +55,9 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 			  };
 			  
 			  this.onjson = function(listener) {
-				  return this.onmessage(_.compose(listener, JSON.parse));
+				  _listeners.json.push(listener);
+				  
+				  return this;
 			  };
 			  
 			  this.onbinary = function(listener) {
@@ -83,10 +85,16 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 			  };
 			  
 			  function _onmessage(msg) {
-				  var listeners = (typeof msg.data === 'string') ?
-						  _listeners.str :
-						  _listeners.binary;
-				  listeners.forEach(function(listener){listener(msg.data);});
+			  	if (typeof msg.data === 'string') {
+			  		_listeners.str.forEach(function(listener){listener(msg.data);});
+			  		
+			  		if (_listeners.json.length > 0) {
+			  			var json = JSON.parse(msg.data);
+			  			_listeners.json.forEach(function(listener){listener(json);});
+			  		}
+			  	} else {
+			  		_listeners.binary.forEach(function(listener){listener(msg.data);});
+			  	}
 			  };
 			  
 			  function _onopen() {
