@@ -20,7 +20,7 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 				  
 				  var _model = null;
 				  
-				  var options = _.defaults(params, {timeout : 3000, retries : 10});
+				  var options = _.defaults(params || {}, {timeout : 3000, retries : 10});
 				  
 				  var _listeners = {binary : [], str : [], json : [], open : []};
 				  
