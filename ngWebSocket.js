@@ -7,26 +7,25 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
   return angular.module('ngWs', []).factory('$ws', function($q, $timeout) {
 	  
 	  var webSocketFactory = function(url, params, ext) {
-
+	  	
 		  var webSocket = function() {
 			  var resolved = false;
 			  
 			  var _model = null;
 			  
-			  var timeout = 3000,
-			  	  retries = 10;
+			  var options = _.defaults(params, {timeout : 3000, retries : 10});
 			  
-			  var _listeners = {binary : [], json : [], open : []};
+			  var _listeners = {binary : [], str : [], open : []};
 			  
 			  var self = this;
 			  
 			  this._ws = null;
 			  
 			  this.connect = function() {
-				  
-				  if (!resolved)
-					  webSocketFactory.connect(url, params, ext)
-					  	.then(function(ws) {
+			  	
+				if (!resolved)
+					webSocketFactory.connect(url, ext)
+				  		.then(function(ws) {
 					  		self._ws = ws;
 					  		self._ws.onmessage = _onmessage;
 					  		_onopen(); 
@@ -35,13 +34,14 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 				  			delete self._ws;
 				  			self._ws = null;
 				  			
+				  			//If there was an exception then we did not close in an orderly manner
 					  		if (e) {
 					  			
-					  			retries -= 1;
+					  			options.retries -= 1;
 					  			
-					  			if (retries > 0) {
+					  			if (options.retries > 0) {
 					  				console.error('Error connecting, reattempting');
-					  				$timeout(self.connect, timeout);
+					  				$timeout(self.connect, options.timeout);
 					  			}
 					  		}
 					  	}
@@ -49,11 +49,15 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 			  };
 			  
 			  this.onmessage = function(listener) {
-				  _listeners.json.push(_.compose(listener, JSON.parse));
+				  _listeners.str.push(listener);
 				  
 				  return this;
 			  };
-				
+			  
+			  this.onjson = function(listener) {
+				  return this.onmessage(_.compose(listener, JSON.parse));
+			  };
+			  
 			  this.onbinary = function(listener) {
 				  _listeners.binary.push(listener);
 				  
@@ -68,7 +72,7 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 			  
 			  this.bind = function(scope, property) {
 				  _model = scope[property];
-				  this.onmessage(function(json){
+				  this.onjson(function(json){
 					  scope.$apply(function() {
 						  _.extend(_model, json);
 					  });
@@ -80,7 +84,7 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 			  
 			  function _onmessage(msg) {
 				  var listeners = (typeof msg.data === 'string') ?
-						  _listeners.json :
+						  _listeners.str :
 						  _listeners.binary;
 				  listeners.forEach(function(listener){listener(msg.data);});
 			  };
@@ -88,28 +92,19 @@ define('ngWebSocket', ['angular', 'underscore'], function(angular) {
 			  function _onopen() {
 				  _listeners.open.forEach(function(listener){listener();});
 			  };
-			  
-			  function _reconnect() {
-				  
-			  }
 		  };
 		  
-		  return new webSocket(url, params, ext);
+		  return new webSocket(params);
 	  };
 	  
-	  webSocketFactory.connect = function(url, params, ext) {
+	  webSocketFactory.connect = function(url, ext) {
 	        var deferred = $q.defer();
 	        
 	        var url = url,
-	            params = params || {},
-	            ext = ext || [],
+	            ext = ext || [];
 	            
-	            query = _.isEmpty(params) ? '' :
-	                    ('?' + _.chain(params).pairs().map(function(pair){
-	                    	return pair.join('=');
-	                    }).value().join('&'));
 	            
-	            var ws = new WebSocket(url + query, ext);
+	            var ws = new WebSocket(url, ext);
 	            
 	            ws.onopen = function() {
 	              deferred.resolve(ws);
