@@ -1,0 +1,30 @@
+doctype html
+html(lang='en')
+    head
+    title= title
+    meta(charset='utf-8')
+    meta(name='viewport', content='width=device-width, initial-scale=1, user-scalable=no')
+    link(rel='stylesheet', href='//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css')
+    //script(src='javascripts/require.js' data-main='javascripts/main')
+    script(src='//ajax.googleapis.com/ajax/libs/angularjs/1.2.15/angular.js')
+    script(src='/ngWebSocket.js' data-main='javascripts/main')
+
+    body(ng-app='simple' ng-controller='Simple')
+        div="{{text}}"
+        div="{{json}}"
+    script.
+        angular.module('simple', ['ngWs'])
+        .controller('Simple', function($scope, $ws) {
+           $ws('ws://localhost:3001', {retries : 5, timeout : 5000})
+           .on('message', function(msg) {
+              $scope.$apply(function(){
+                $scope.text = msg;
+              })
+           })
+           .on('json', function(json) {
+             $scope.$apply(function() {
+               $scope.json = json.name;
+             })
+           })
+           .connect();
+        })
