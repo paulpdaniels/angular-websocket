@@ -1,0 +1,17 @@
+{
+    "name": "angular-websocket",
+    "description": "AngularJS directive that adds a wrapper for websockets to your app. Based on javascript WebSocket.",
+    "version": "0.2.2",
+    "main": ["ngWebSocket.js"],
+    "homepage": "http://github.com/paulpdaniels/angular-websocket",
+    "author": "Paul Daniels",
+    "license": "MIT",
+    "readmeFilename": "README.md",
+    "dependencies": {
+        "angular": "~1.2.0"
+    },
+    "devDependencies": {
+        "underscore": "~1.6.0",
+        "rx-lite" : "2.2.20"
+    }
+}

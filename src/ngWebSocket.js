@@ -1,141 +1,183 @@
-var def = define || function(name, deps, method) {
-	var angular = angular || null;
-	return method(angular);
-};
+'use strict';
 
-define('ngWebSocket', ['angular', 'underscore'], function(angular) {
-  return angular.module('ngWs', []).provider('$ws', function() {
-  	
-  	var _factory = WebSocket;
-  	
-  	this.setWebSocketFactory = function(factory) {
-  		_factory = factory;
-  	}
-	  
-	  this.$get = function($q, $timeout) {
-		  var webSocketFactory = function(url, params, ext) {
-		  	
-			  var webSocket = function() {
-				  var resolved = false;
-				  
-				  var _model = null;
-				  
-				  var options = _.defaults(params || {}, {timeout : 3000, retries : 10});
-				  
-				  var _listeners = {binary : [], str : [], json : [], open : []};
-				  
-				  var self = this;
-				  
-				  this._ws = null;
-				  
-				  this.connect = function() {
-				  	
-					if (!resolved)
-						webSocketFactory.connect(url, ext)
-					  		.then(function(ws) {
-						  		self._ws = ws;
-						  		self._ws.onmessage = _onmessage;
-						  		_onopen(); 
-						  	},
-						  	function(e) {
-					  			delete self._ws;
-					  			self._ws = null;
-					  			
-					  			//If there was an exception then we did not close in an orderly manner
-						  		if (e) {
-						  			
-						  			options.retries -= 1;
-						  			
-						  			if (options.retries > 0) {
-						  				console.error('Error connecting, reattempting');
-						  				$timeout(self.connect, options.timeout);
-						  			}
-						  		}
-						  	}
-						  	);
-				  };
-				  
-				  this.onmessage = function(listener) {
-					  _listeners.str.push(listener);
-					  
-					  return this;
-				  };
-				  
-				  this.onjson = function(listener) {
-					  _listeners.json.push(listener);
-					  
-					  return this;
-				  };
-				  
-				  this.onbinary = function(listener) {
-					  _listeners.binary.push(listener);
-					  
-					  return this;
-				  };
-					
-				  this.onopen = function(listener) {
-					  _listeners.open.push(listener);
-					  
-					  return this;
-				  };
-				  
-				  this.bind = function(scope, property) {
-					  _model = scope[property];
-					  this.onjson(function(json){
-						  scope.$apply(function() {
-							  _.extend(_model, json);
-						  });
-					  });
-					  
-					  return this;
-					  
-				  };
-				  
-				  function _onmessage(msg) {
-				  	if (typeof msg.data === 'string') {
-				  		_listeners.str.forEach(function(listener){listener(msg.data);});
-				  		
-				  		if (_listeners.json.length > 0) {
-				  			var json = JSON.parse(msg.data);
-				  			_listeners.json.forEach(function(listener){listener(json);});
-				  		}
-				  	} else {
-				  		_listeners.binary.forEach(function(listener){listener(msg.data);});
-				  	}
-				  };
-				  
-				  function _onopen() {
-					  _listeners.open.forEach(function(listener){listener();});
-				  };
-			  };
-			  
-			  return new webSocket(params);
-		  };
-		  
-		  webSocketFactory.connect = function(url, ext) {
-		        var deferred = $q.defer();
-		        
-		        var url = url,
-		            ext = ext || [];
-		            
-		            
-		            var ws = new _factory(url, ext);
-		            
-		            ws.onopen = function() {
-		              deferred.resolve(ws);
-		            };
-		            
-		            ws.onerror = function(e) {
-		              deferred.reject(e);
-		            };
-		            
-		            ws.onclose = function(r) {
-		              deferred.reject();
-		            };
-		            return deferred.promise;
-		      };
-	    
-	    return webSocketFactory;
-	  };
-  });
-});
+(function (root) {
+
+    var _ = root._,
+        Rx = root.Rx,
+        define = root.define,
+        angular = root.angular;
+
+
+    angular.module('ngWs', []).provider('$ws', function () {
+
+        var Factory = WebSocket;
+
+        this.setWebSocketFactory = function (factory) {
+            Factory = factory;
+        };
+
+        this.$get = function ($q, $timeout) {
+            var webSocketFactory = function (url, params, ext) {
+
+                var Socket = function () {
+
+                    function getData(msg) {
+                        return msg.data;
+                    }
+
+                    function isString(msg) {
+                        return typeof msg === 'string';
+                    }
+
+                    function getJsonData(msg) {
+                        try {
+                            return JSON.parse(msg);
+                        } catch (e) {
+                            return null;
+                        }
+                    }
+
+                    function isBlob(msg) {
+                        return typeof msg !== 'string';
+                    }
+
+                    this.resolved = false;
+
+                    //Everything should come through the raw event
+                    var raw = new Rx.Subject(),
+
+                    //Surface the data that we get from msg through this observable
+                        data = raw.map(getData),
+
+                    //Next we surface string messages through the message subscriber
+                        message = data.where(isString),
+
+                    //Now we should also keep track of binary messages
+                        binary = data.where(isBlob),
+
+                    //Messages that can be parsed as json are finally processed
+                        json = message.map(getJsonData).where(function (data) {
+                            return data !== null;
+                        }),
+
+
+                    //Track the message
+                        open = new Rx.Subject(),
+
+                        close = new Rx.Subject();
+
+                    var handlers = {
+                        raw : raw,
+                        message : message,
+                        json : json,
+                        open : open,
+                        close: close,
+                        binary : binary
+                    };
+
+                    var options = _.defaults(params || {}, {timeout: 3000, retries: 10});
+
+                    this._ws = null;
+
+                    this.connect = function () {
+
+                        var self = this;
+
+                        if (!this.resolved) {
+                            webSocketFactory.connect(url, ext)
+                                .then(function (ws) {
+                                    self._ws = ws;
+                                    self._ws.onmessage = function(msg) {
+                                        raw.onNext(msg);
+                                    };
+                                    open.onNext();
+
+                                    self._ws.onclose = function () {
+                                        close.onNext();
+                                    };
+                                },
+                                function (e) {
+                                    delete self._ws;
+                                    self._ws = null;
+
+                                    //If there was an exception then we did not close in an orderly manner
+                                    if (e) {
+
+                                        options.retries -= 1;
+
+                                        if (options.retries > 0) {
+                                            console.error('Error connecting, reattempting');
+                                            $timeout(self.connect, options.timeout);
+                                        }
+                                    }
+                                }
+                            );
+                        }
+
+                        return self;
+                    };
+
+                    this.on = function (name, handler) {
+
+                        if (handlers[name]) {
+                            handlers[name].subscribe(handler);
+                        }
+
+                        return this;
+                    };
+                };
+
+                Socket.prototype.bind = function (scope, property) {
+                    this.on('json', function (json) {
+                        scope.$apply(function () {
+                            _.extend(scope[property], json);
+                        });
+
+                    });
+
+                    return this;
+
+                };
+
+
+
+                return new Socket(params);
+            };
+
+            webSocketFactory.connect = function (url, ext) {
+                var deferred = $q.defer();
+
+                ext = ext || [];
+
+
+                var ws = new Factory(url, ext);
+
+                ws.onopen = function () {
+                    deferred.resolve(ws);
+                };
+
+                ws.onerror = function (e) {
+                    deferred.reject(e);
+                };
+
+                ws.onclose = function () {
+                    deferred.reject();
+                };
+                return deferred.promise;
+            };
+
+            return webSocketFactory;
+        };
+    });
+
+    if (typeof define === 'function' && typeof define.amd === 'object' && define.amd) {
+
+        require(function() {
+            return angular;
+        });
+    } else {
+        // in a browser or Rhino
+        root.angular = angular;
+    }
+
+})(window, null);
