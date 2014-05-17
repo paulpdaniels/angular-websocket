@@ -1,76 +1,81 @@
 'use strict';
 
-;
-(function (root, angular) {
+(function (root) {
 
-    var Emitter = root.Emitter;
+    var _ = root._,
+        Rx = root.Rx,
+        define = root.define,
+        angular = root.angular;
 
 
-    var ngWebSocket = angular.module('ngWs', []).provider('$ws', function () {
+    angular.module('ngWs', []).provider('$ws', function () {
 
-        var _factory = WebSocket;
+        var Factory = WebSocket;
 
         this.setWebSocketFactory = function (factory) {
-            _factory = factory;
+            Factory = factory;
         };
 
         this.$get = function ($q, $timeout) {
             var webSocketFactory = function (url, params, ext) {
 
-                var actionableEvents = [
-                    'json',
-                    'message',
-                    'raw',
-                    'binary',
-                    'open',
-                    'close',
-                    'error'
-                ];
-
                 var Socket = function () {
-
-
 
                     function getData(msg) {
                         return msg.data;
-                    };
+                    }
 
                     function isString(msg) {
-                        return typeof msg.data === 'string';
-                    };
+                        return typeof msg === 'string';
+                    }
+
+                    function getJsonData(msg) {
+                        try {
+                            return JSON.parse(msg);
+                        } catch (e) {
+                            return null;
+                        }
+                    }
+
+                    function isBlob(msg) {
+                        return typeof msg !== 'string';
+                    }
 
                     this.resolved = false;
 
+                    //Everything should come through the raw event
                     var raw = new Rx.Subject(),
-                        message = raw.where(isString).map(getData),
-                        json = message.map(function(data) {
-                            try {return JSON.parse(data);} catch(e) { return null; }
-                        })
-                        .where(function(data) { return data != null;}),
-                        binary = raw.where(function(msg) {
-                            return typeof msg.data !== 'string'
-                        })
-                        .map(function(msg) {
-                                return msg.data;
-                        });
 
-                    var open = new Rx.Subject();
+                    //Surface the data that we get from msg through this observable
+                        data = raw.map(getData),
+
+                    //Next we surface string messages through the message subscriber
+                        message = data.where(isString),
+
+                    //Now we should also keep track of binary messages
+                        binary = data.where(isBlob),
+
+                    //Messages that can be parsed as json are finally processed
+                        json = message.map(getJsonData).where(function (data) {
+                            return data !== null;
+                        }),
+
+
+                    //Track the message
+                        open = new Rx.Subject(),
+
+                        close = new Rx.Subject();
 
                     var handlers = {
                         raw : raw,
                         message : message,
                         json : json,
                         open : open,
+                        close: close,
                         binary : binary
                     };
 
-                    var self = this;
-
-                    var _model = null;
-
                     var options = _.defaults(params || {}, {timeout: 3000, retries: 10});
-
-                    var self = this;
 
                     this._ws = null;
 
@@ -85,7 +90,11 @@
                                     self._ws.onmessage = function(msg) {
                                         raw.onNext(msg);
                                     };
-                                    open.onCompleted();
+                                    open.onNext();
+
+                                    self._ws.onclose = function () {
+                                        close.onNext();
+                                    };
                                 },
                                 function (e) {
                                     delete self._ws;
@@ -104,11 +113,15 @@
                                 }
                             );
                         }
+
+                        return self;
                     };
 
                     this.on = function (name, handler) {
-                        if (handlers[name])
+
+                        if (handlers[name]) {
                             handlers[name].subscribe(handler);
+                        }
 
                         return this;
                     };
@@ -119,6 +132,7 @@
                         scope.$apply(function () {
                             _.extend(scope[property], json);
                         });
+
                     });
 
                     return this;
@@ -136,7 +150,7 @@
                 ext = ext || [];
 
 
-                var ws = new _factory(url, ext);
+                var ws = new Factory(url, ext);
 
                 ws.onopen = function () {
                     deferred.resolve(ws);
@@ -146,7 +160,7 @@
                     deferred.reject(e);
                 };
 
-                ws.onclose = function (r) {
+                ws.onclose = function () {
                     deferred.reject();
                 };
                 return deferred.promise;
@@ -156,7 +170,7 @@
         };
     });
 
-    if (typeof define == 'function' && typeof define.amd == 'object' && define.amd) {
+    if (typeof define === 'function' && typeof define.amd === 'object' && define.amd) {
 
         require(function() {
             return angular;
@@ -166,4 +180,4 @@
         root.angular = angular;
     }
 
-})(window, angular);
+})(window, null);

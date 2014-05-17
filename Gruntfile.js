@@ -8,7 +8,7 @@ module.exports = function (grunt) {
         concat : {
             dist : {
                 files : {
-                    'dist/ngWebSocket.js' : ['bower_components/underscore/underscore.js', 'src/rx.lite.js',  'src/ngWebSocket.js']
+                    'dist/ngWebSocket.js': ['bower_components/underscore/underscore.js', 'src/libs/rx.lite.js', 'src/ngWebSocket.js']
                 }
             }
         },

@@ -1,11 +1,12 @@
 /**
  * Created by Paul on 5/8/2014.
  */
+'use strict';
+
 var express = require('express')
     ,http    = require('http')
     ,path = require('path')
     , WebSocketServer = require('ws').Server
-    , wss = new WebSocketServer({port : 3001})
     ,app = express();
 
 app.configure(function() {
@@ -39,10 +40,12 @@ server.listen(app.get('port'), function(){
     console.log('Express server listener on port ' + app.get('port'));
 });
 
+var wss = new WebSocketServer({server: server});
+
 wss.on('connection', function(socket) {
     setTimeout( function() {
     socket.send(JSON.stringify({name : 'Not as good'}));
     socket.send('I am good');
-        }, 3000);
+    }, 0);
 });
 

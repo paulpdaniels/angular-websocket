@@ -15,7 +15,7 @@ html(lang='en')
     script.
         angular.module('simple', ['ngWs'])
         .controller('Simple', function($scope, $ws) {
-           $ws('ws://localhost:3001', {retries : 5, timeout : 5000})
+           $ws('ws://localhost:3000', {retries : 5, timeout : 5000})
            .on('message', function(msg) {
               $scope.$apply(function(){
                 $scope.text = msg;
@@ -25,6 +25,12 @@ html(lang='en')
              $scope.$apply(function() {
                $scope.json = json.name;
              })
+           })
+           .on('open', function() {
+              console.log('Opened socket');
+           })
+           .on('close', function() {
+              console.log('Closed socket');
            })
            .connect();
         })
